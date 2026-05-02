@@ -1,85 +1,49 @@
 <!DOCTYPE html>
-<html>
-<head>
-    <title id="tab-title">Login</title>
-    <meta charset="UTF-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <link rel="stylesheet" href="css/fontawesome.css"/>
-    <link rel="stylesheet" href="css/index.css"/>
-    <link id="tab-icon" rel="icon" type="image/x-icon" href="https://login.classlink.com/favicon.ico">
-</head>
-<body>
-    <video id="camstatic" preload="auto" muted style="display: none;">
-        <source src="img/camstatic.mp4" type="video/mp4">
-    </video>
-    <canvas id="matrix"></canvas>
-    <div id="overlay"></div>
-    
-    <div style="position: relative; z-index: 10; color: white; padding: 20px;">
-        <h1>Nathan's Gxmes</h1>
-        <h2>gatekeep ts 🥀</h2>
-        
-        <div class="cloak-buttons">
-            <button onclick="applyCloak('google')">Google</button>
-            <button onclick="applyCloak('classroom')">Classroom</button>
-            <button onclick="applyCustomCloak()">Custom Cloak</button>
-        </div>
 
-        <iframe src="pages/lessons/lessons.html" id="pageiframe" style="width:100%; height:500px;"></iframe>
-    </div>
+    <html>
 
-    <script>
-        // --- 1. PANIC KEY CONFIG ---
-        const panicUrl = "https://www.google.com"; 
-        const panicKey = "`"; 
+        <head>
 
-        window.addEventListener('keydown', (e) => {
-            if (e.key === panicKey) {
-                window.location.href = panicUrl;
-            }
-        });
+            <title>Login</title>
 
-        // --- 2. CLOAKING ENGINE ---
-        const titleElement = document.getElementById('tab-title');
-        const iconElement = document.getElementById('tab-icon');
+            <meta charset="UTF-8"/>
 
-        function applyCloak(type) {
-            const presets = {
-                'google': { t: 'Google', i: 'https://www.google.com/favicon.ico' },
-                'classroom': { t: 'Classes', i: 'https://ssl.gstatic.com/classroom/favicon.png' },
-                'drive': { t: 'My Drive - Google Drive', i: 'https://ssl.gstatic.com/docs/doclist/images/drive_2022q3_32dp.png' }
-            };
+            <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
-            if (presets[type]) {
-                titleElement.innerText = presets[type].t;
-                iconElement.href = presets[type].i;
-                localStorage.setItem('savedCloak', JSON.stringify(presets[type]));
-            }
-        }
+            <link rel="stylesheet" href="css/fontawesome.css"/>
 
-        // --- 3. CUSTOM OPTION ---
-        function applyCustomCloak() {
-            const newTitle = prompt("Enter custom tab title:");
-            const newIcon = prompt("Enter custom favicon URL (link to an icon):");
+            <link rel="stylesheet" href="css/index.css"/>
 
-            if (newTitle && newIcon) {
-                titleElement.innerText = newTitle;
-                iconElement.href = newIcon;
-                
-                // Save it so it stays even if you refresh
-                localStorage.setItem('savedCloak', JSON.stringify({ t: newTitle, i: newIcon }));
-            }
-        }
+        </head>
 
-        // --- 4. PERSISTENCE (Keep cloak after refresh) ---
-        window.onload = () => {
-            const saved = localStorage.getItem('savedCloak');
-            if (saved) {
-                const data = JSON.parse(saved);
-                titleElement.innerText = data.t;
-                iconElement.href = data.i;
-            }
-        };
-    </script>
-</body>
-</html>
+        <link rel="icon" type="image/x-icon" href="https://login.classlink.com/favicon.ico">
+
+        <body>
+
+            <video id="camstatic" preload="auto" muted style="display: none;">
+
+            <source src="img/camstatic.mp4" type="video/mp4">
+
+            Your browser does not support the video tag.
+
+            </video>
+
+            <canvas id="matrix"></canvas>
+
+            <div id="overlay"></div>
+
+            <div id="overlaygreen1"></div>
+
+            <div id="overlaygreen2"></div>
+
+            <br>
+
+            <h1>Nathan's Gxmes</h1>
+
+            <h2>gatekeep ts 🥀 all the best games here, enjoy you fiends ✌️</h2>
+
+            <iframe src="pages/lessons/lessons.html" id="pageiframe"></iframe>
+
+        </body>
+
+    </html>
