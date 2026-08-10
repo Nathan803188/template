@@ -1,0 +1,1498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Splat.io</title>
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #111; color: #fff; font-family: 'Lexend', sans-serif; }
+        canvas { display: block; background-color: #e0e0e0; cursor: crosshair; }
+        
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(0,0,0,0.85); z-index: 10; }
+        .hidden { display: none !important; }
+        
+        #hud { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); pointer-events: auto; z-index: 5; background: rgba(0, 0, 0, 0.7); padding: 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px; }
+        .inventory-row { display: flex; gap: 10px; }
+        
+        #health-bar-container, #xp-bar-container { width: 100%; height: 18px; background: #222; border-radius: 6px; border: 2px solid #555; position: relative; overflow: hidden; pointer-events: none;}
+        #xp-bar-container { height: 12px; border-color: #444; margin-top: -5px; }
+        #health-bar-fill { width: 100%; height: 100%; background: #00ff88; transition: width 0.1s, background-color 0.2s; }
+        #xp-bar-fill { width: 0%; height: 100%; background: #00ccff; transition: width 0.3s; }
+        #health-text { position: absolute; top: -1px; left: 0; width: 100%; text-align: center; font-size: 14px; font-weight: bold; color: #fff; text-shadow: 1px 1px 2px #000; }
+        #xp-text { position: absolute; top: -2px; left: 0; width: 100%; text-align: center; font-size: 10px; font-weight: bold; color: #fff; text-shadow: 1px 1px 2px #000; }
+        
+        /* Custom Tooltips for Inventory */
+        .inv-slot { position: relative; padding: 10px; border-radius: 4px; background: #222; border-bottom: 5px solid #555; transition: 0.1s; width: 120px; text-align: center; font-size: 0.9rem; white-space: nowrap; overflow: visible; cursor: pointer;}
+        .inv-slot.active { background: #333; transform: translateY(-10px); font-weight: bold; box-shadow: 0px 4px 10px rgba(0,0,0,0.5); }
+        .inv-name { display: block; overflow: hidden; text-overflow: ellipsis; pointer-events: none;}
+        
+        .tooltip { visibility: hidden; background-color: rgba(15, 15, 20, 0.95); color: #fff; text-align: left; padding: 12px; border-radius: 6px; position: absolute; z-index: 100; bottom: 130%; left: 50%; transform: translateX(-50%); width: max-content; max-width: 260px; border: 2px solid #555; font-size: 0.8rem; pointer-events: none; opacity: 0; transition: opacity 0.2s; box-shadow: 0px 5px 15px rgba(0,0,0,0.7); white-space: normal; line-height: 1.4; }
+        .inv-slot:hover .tooltip { visibility: visible; opacity: 1; }
+
+        #timer-display { position: absolute; top: 20px; right: 20px; font-size: 2rem; font-weight: bold; background: rgba(0, 0, 0, 0.7); padding: 10px 20px; border-radius: 8px; z-index: 5; text-align: center;}
+        #event-banner { font-size: 1.2rem; margin-top: 5px; font-weight: 900; text-transform: uppercase; text-shadow: 0 0 10px currentColor; display: none;}
+        
+        #event-timers { position: absolute; top: 90px; left: 20px; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 8px; font-size: 1rem; z-index: 5; pointer-events: none;}
+        #event-timers h3 { margin: 0 0 10px 0; color: #00ffcc; font-size: 1.1rem; text-transform: uppercase;}
+        .event-row { margin-bottom: 5px; font-weight: bold; }
+
+        #live-leaderboard { position: absolute; top: 120px; right: 20px; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 8px; z-index: 5; pointer-events: none; width: 220px; max-height: 400px; overflow: hidden;}
+        .live-row { display: flex; justify-content: space-between; font-size: 0.95rem; margin-bottom: 6px; font-weight: bold; text-shadow: 1px 1px 2px #000;}
+        
+        #ctf-score-display { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); padding: 15px 30px; border-radius: 8px; z-index: 5; font-size: 2rem; font-weight: 900; display: none; gap: 20px; text-shadow: 2px 2px 0 #000; }
+        
+        h1 { margin: 0 0 15px 0; font-size: 3rem; color: #ff0055; text-transform: uppercase; letter-spacing: 2px;}
+        h2 { font-size: 2rem; color: #00ffcc; margin: 0 0 10px 0;}
+        ul { list-style: none; padding: 0; margin: 0 0 20px 0; font-size: 1.1rem; line-height: 1.6;}
+        
+        select, button { font-family: 'Lexend', sans-serif; padding: 15px 30px; font-size: 1.5rem; font-weight: bold; cursor: pointer; background: #00ffcc; border: none; border-radius: 8px; color: #111; transition: 0.2s; margin-top: 10px;}
+        button:hover, select:hover { background: #fff; transform: scale(1.05); }
+        
+        #username-input { font-family: 'Lexend', sans-serif; padding: 10px; font-size: 1.2rem; border-radius: 5px; border: none; text-align: center; font-weight: bold; background: #222; color: #fff; outline: 2px solid #00ffcc; width: 250px;}
+        #menu-level-display { margin-top: 10px; font-size: 1.2rem; color: #00ccff; font-weight: bold;}
+        
+        #scoreboard { display: flex; flex-direction: column; gap: 5px; margin-bottom: 20px; width: 600px; max-height: 400px; overflow-y: auto; background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px;}
+        .score-row { display: flex; justify-content: space-between; padding: 10px; border-radius: 5px; font-weight: bold; color: #111;}
+        .score-header { color: #00ffcc; font-weight: 900; border-bottom: 2px solid #555; padding-bottom: 10px; margin-bottom: 10px; display: flex; justify-content: space-between;}
+        .score-col { flex: 1; text-align: center; }
+        .score-col:first-child { flex: 2; text-align: left; padding-left: 10px;}
+
+        #radio-player { position: absolute; top: 20px; left: 20px; background: rgba(15, 15, 20, 0.85); border: 2px solid #333; border-radius: 8px; padding: 10px 15px; z-index: 50; display: flex; align-items: center; gap: 15px; backdrop-filter: blur(4px); box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .radio-controls { display: flex; gap: 8px; }
+        .radio-btn { font-family: 'Lexend', sans-serif; background: #2a2d38; border: 1px solid #4a4d58; color: #fff; border-radius: 5px; width: 32px; height: 32px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: background 0.2s; padding: 0; margin: 0;}
+        .radio-btn:hover { background: #ff3366; border-color: #ff3366; }
+        .radio-info { display: flex; flex-direction: column; width: 170px; pointer-events: none;}
+        .radio-title { font-size: 11px; color: #ffbb00; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; font-weight: bold;}
+        .radio-track { font-size: 12px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+        
+        #nuke-flash { position: fixed; top:0; left:0; width: 100%; height: 100%; background: #fff; z-index: 9999; opacity: 0; pointer-events: none; transition: opacity 0.15s ease-out; }
+    </style>
+</head>
+<body>
+
+    <div id="nuke-flash"></div>
+
+    <div id="main-menu" class="overlay">
+        <h1>Splat.io</h1>
+        <div style="margin-bottom: 20px; text-align: center;">
+            <input type="text" id="username-input" placeholder="Enter Username" maxlength="16">
+            <div id="menu-level-display">Level 1 | XP: 0 / 1000</div>
+        </div>
+        
+        <select id="mode-select" style="font-size: 1.2rem; margin-bottom: 20px; background: #222; color: #fff; outline: 2px solid #00ffcc;">
+            <option value="ffa">Free-For-All (10 Players)</option>
+            <option value="1v1">1v1 Duel</option>
+            <option value="5v5">5v5 Turf War</option>
+            <option value="ctf">5v5 Capture The Flag</option>
+            <option value="15v15">15v15 Turf War</option>
+            <option value="30v30">30v30 Turf War</option>
+            <option value="50v50">50v50 Massive War</option>
+        </select>
+
+        <ul>
+            <li><strong>WASD</strong>: Move | <strong>Mouse</strong>: Aim & Shoot</li>
+            <li><strong>1-4</strong>: Switch Inventory Slots</li>
+            <li><strong>???</strong>: Find Secrets!</li>
+        </ul>
+        <button onclick="startGame()">Start Match</button>
+    </div>
+
+    <div id="game-over" class="overlay hidden">
+        <h2>Match Over!</h2>
+        <div id="match-xp-gains" style="color: #00ccff; font-size: 1.2rem; margin-bottom: 15px; font-weight: bold; text-align: center;"></div>
+        <div id="scoreboard">
+            <div class="score-header" id="score-header-bar">
+                <span class="score-col">Player</span>
+                <span class="score-col">Turf %</span>
+                <span class="score-col">Kills</span>
+                <span class="score-col">Deaths</span>
+                <span class="score-col">K/D Ratio</span>
+            </div>
+        </div>
+        <button onclick="location.reload()">Return to Menu</button>
+    </div>
+
+    <input type="file" id="custom-audio-input" accept="audio/*" multiple style="display:none;">
+    <div id="radio-player">
+        <div class="radio-controls">
+            <button class="radio-btn" id="radio-play-btn" onclick="toggleRadio()">▶</button>
+            <button class="radio-btn" onclick="nextTrack()" title="Next Track">⏭</button>
+            <button class="radio-btn" onclick="nextStation()" title="Change Station">📻</button>
+        </div>
+        <div class="radio-info">
+            <span class="radio-title" id="radio-station-name">SPLAT FM</span>
+            <span class="radio-track" id="radio-track-name">Track 1: Spin Eternally</span>
+        </div>
+    </div>
+    
+    <div id="event-timers" class="hidden">
+        <h3>Event Schedule</h3>
+        <div class="event-row">Glitched: <span id="time-glitch" style="color:#ff00ff">--:--:--</span></div>
+        <div class="event-row">Space: <span id="time-space" style="color:#9933ff">--:--:--</span></div>
+        <div class="event-row">Fallout: <span id="time-fallout" style="color:#33ff33">--:--:--</span></div>
+    </div>
+
+    <div id="live-leaderboard" class="hidden"></div>
+    
+    <div id="ctf-score-display">
+        <span id="ctf-red" style="color: #ff0055;">RED: 0</span>
+        <span style="color: #fff;">|</span>
+        <span id="ctf-blue" style="color: #0088ff;">BLUE: 0</span>
+    </div>
+
+    <div id="hud" class="hidden">
+        <div id="health-bar-container">
+            <div id="health-bar-fill"></div>
+            <div id="health-text">100 / 100 HP</div>
+        </div>
+        <div id="xp-bar-container">
+            <div id="xp-bar-fill"></div>
+            <div id="xp-text">Lvl 1 (0/1000)</div>
+        </div>
+        <div class="inventory-row">
+            <div id="inv-0" class="inv-slot active">
+                <span class="inv-name" id="inv-name-0">[1] Finger Paint</span>
+                <div class="tooltip" id="tip-0"></div>
+            </div>
+            <div id="inv-1" class="inv-slot">
+                <span class="inv-name" id="inv-name-1">[2] Empty</span>
+                <div class="tooltip" id="tip-1"></div>
+            </div>
+            <div id="inv-2" class="inv-slot">
+                <span class="inv-name" id="inv-name-2">[3] Empty</span>
+                <div class="tooltip" id="tip-2"></div>
+            </div>
+            <div id="inv-3" class="inv-slot">
+                <span class="inv-name" id="inv-name-3">[4] Empty</span>
+                <div class="tooltip" id="tip-3"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="timer-display" class="hidden">
+        <div id="time-text">5:00</div>
+        <div id="event-banner">SPACE EVENT ACTIVE</div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+    // --- Save Data & Leveling ---
+    let playerData = JSON.parse(localStorage.getItem('paintSplatSave')) || { username: 'Player', level: 1, xp: 0 };
+    document.getElementById('username-input').value = playerData.username;
+    
+    function updateMenuLevel() {
+        let needed = playerData.level * 1000;
+        document.getElementById('menu-level-display').innerText = `Level ${playerData.level} | XP: ${Math.floor(playerData.xp)} / ${needed}`;
+    }
+    updateMenuLevel();
+
+    function addXP(amount) {
+        playerData.xp += amount;
+        let needed = playerData.level * 1000;
+        let leveledUp = false;
+        while (playerData.xp >= needed) {
+            playerData.xp -= needed;
+            playerData.level++;
+            needed = playerData.level * 1000;
+            leveledUp = true;
+        }
+        localStorage.setItem('paintSplatSave', JSON.stringify(playerData));
+        return leveledUp;
+    }
+
+    const BOT_NAMES = [
+        'Player5747', 'Blitz', 'bill cipher', 'kerosene', 'Monochrome', 'ManorGD [DEV]', 'SevenSevenSeven', 'Player1293', 'Mario', 'xenomorph', 
+        'Blixer', 'N', 'allstarrr', 'Mr_L', 'quake3fan', 'ImComingForYou_Blixer', 'xX_NoobSlayer_Xx', 'Beat_Saber_Pro', '67god', 'Zeronium',
+        'unblockedgames03', 'slashrrr', 'FrostiUwU', 'rico', 'average_jo', 'wickedsick', 'newb', 'LumenOwO', 'GREENFN', '1v1mebro', 
+        'unfriendlyfire', 'imliterallyabotlol', 'Talon', 'perrytheplatypus', '=D', 'purist', 'ZROOMVROOM', 'prosniper', 'polybuzzr_09', 
+        'da_fallen', 'professor_oak', 'trollr', '$$$', 'Drag0nBall', 'OuO', 'Dr_Doofensmirtz', 'DOMER', 'hello =)', 'NEVERTHELESS', 
+        'good_timez', 'qwerty', 'funniman', 'Hugh Jazz', 'WEWILLROCKU', '^_^', 'brocolli_zoomers', 'kingstepalot', 'hi_pleasespareme', 
+        '2023waspeak', 'yowassup', 'Get_AJob', 'owosenpai', 'Viper', 'wasdarrowkeys', 'Player', 'Slayer', 'O_0', 'im_crine', 'Granite_Guy', 
+        'FireInTheHole', 'Gemini', 'whatsursign', 'Taurus', 'dontcomeclosetomeorilloneshotyou'
+    ];
+    let availableNames = [...BOT_NAMES];
+    function getRandomName() {
+        if (availableNames.length === 0) availableNames = [...BOT_NAMES];
+        return availableNames.splice(Math.floor(Math.random() * availableNames.length), 1)[0];
+    }
+    const BOT_SKILLS = ['noob', 'average', 'pro'];
+
+    // --- Audio System ---
+    const radioStations = {
+        "SPLAT FM": [
+            { url: "https://cdn.jsdelivr.net/gh/Nathan803188/soundtracks@main/Beat%20Saber%20OST%20Vol.%204%20%20Spin%20Eternally%20%5BExpert%5D.mp3", name: "Spin Eternally" },
+            { url: "https://cdn.jsdelivr.net/gh/Nathan803188/soundtracks@main/Dimrain47%20-%20At%20the%20Speed%20of%20Light.mp3", name: "At the Speed of Light" },
+            { url: "https://cdn.jsdelivr.net/gh/Nathan803188/soundtracks@main/ColBreakz%20-%202011.mp3", name: "ColBreakz - 2011" },
+            { url: "https://cdn.jsdelivr.net/gh/Nathan803188/soundtracks@main/Fire%20Aura.mp3", name: "Fire Aura" }
+        ],
+        "GAMERZ RADIO": [
+            { url: "https://cdn.jsdelivr.net/gh/Nathan803188/soundtracks@main/Rolling%20Sky%20OST%20-%20Matrix.mp3", name: "Matrix" },
+            { url: "https://cdn.jsdelivr.net/gh/Nathan803188/soundtracks@main/Super%20Mario%20Galaxy%20Soundtrack%20-%20Gusty%20Garden%20Galaxy.mp3", name: "Gusty Garden Galaxy" },
+            { url: "https://cdn.jsdelivr.net/gh/Nathan803188/soundtracks@main/BTD6%20OST%20-%20Title%20Music%20(Party%20Time).mp3", name: "BTD6 Party Time" },
+            { url: "https://cdn.jsdelivr.net/gh/Nathan803188/soundtracks@main/Undertale%20-%20Spider%20Dance%20(Shirobon%20Remix).mp3", name: "Spider Dance Remix" }
+        ],
+        "PAINTRRZ FM": [
+            { url: "https://cdn.jsdelivr.net/gh/Nathan803188/soundtracks@main/MONTAGEM%20DOMER%20(Super%20Slowed).mp3", name: "MONTAGEM DOMER (Slowed)" }
+        ],
+        "88.3 FM (LOCAL)": [] 
+    };
+
+    const stationNames = Object.keys(radioStations);
+    let currentStationIdx = 0, currentTrackIdx = 0;
+    let bgm = new Audio(radioStations[stationNames[0]][0].url); bgm.volume = 0.3; bgm.addEventListener('ended', nextTrack);
+    
+    let eventAudio = new Audio();
+    eventAudio.loop = true;
+    eventAudio.volume = 0.4;
+    let lastHandledEvent = 'None';
+
+    function updateRadioUI() {
+        if (getActiveEvent() !== 'None') {
+            document.getElementById('radio-station-name').innerText = "EMERGENCY BROADCAST";
+            document.getElementById('radio-track-name').innerText = "EVENT OVERRIDE ACTIVE";
+            return;
+        }
+        let list = radioStations[stationNames[currentStationIdx]];
+        document.getElementById('radio-station-name').innerText = stationNames[currentStationIdx];
+        document.getElementById('radio-track-name').innerText = list.length === 0 ? "Click 📻 to import..." : `[${currentTrackIdx + 1}/${list.length}] ${list[currentTrackIdx].name}`;
+    }
+    
+    function toggleRadio() {
+        if (getActiveEvent() !== 'None') return; 
+        if (radioStations[stationNames[currentStationIdx]].length === 0) return;
+        if (bgm.paused) { bgm.play(); document.getElementById('radio-play-btn').innerText = '⏸'; } 
+        else { bgm.pause(); document.getElementById('radio-play-btn').innerText = '▶'; }
+    }
+    function nextTrack() {
+        if (getActiveEvent() !== 'None') return;
+        let station = stationNames[currentStationIdx]; if (radioStations[station].length === 0) return;
+        currentTrackIdx = (currentTrackIdx + 1) % radioStations[station].length; changeAudioSource(radioStations[station][currentTrackIdx].url);
+    }
+    function nextStation() {
+        if (getActiveEvent() !== 'None') return;
+        currentStationIdx = (currentStationIdx + 1) % stationNames.length; currentTrackIdx = 0;
+        let station = stationNames[currentStationIdx];
+        if (station === "88.3 FM (LOCAL)" && radioStations[station].length === 0) {
+            document.getElementById('custom-audio-input').click(); updateRadioUI(); bgm.pause();
+            document.getElementById('radio-play-btn').innerText = '▶'; return;
+        }
+        changeAudioSource(radioStations[station][currentTrackIdx].url);
+    }
+    function changeAudioSource(url) {
+        let wasPlaying = !bgm.paused; bgm.src = url; updateRadioUI();
+        if (wasPlaying || document.getElementById('radio-play-btn').innerText === '⏸') bgm.play().catch(()=>{});
+    }
+
+    // --- Engine Setup ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+
+    const mapWidth = 4200; const mapHeight = 3200;
+    const camera = { x: 0, y: 0 };
+    const paintLayer = document.createElement('canvas'); paintLayer.width = mapWidth; paintLayer.height = mapHeight;
+    const paintCtx = paintLayer.getContext('2d');
+
+    let isPlaying = false, timeLeft = 300, lastTime = Date.now(), chestSpawnTimer = 0;
+    let liveRankings = []; let lastLiveScoreCalc = 0;
+    let gameMode = 'ffa';
+    let ctfActive = false;
+    let ctfScores = { Red: 0, Blue: 0 };
+    let ctfFlags = [];
+
+    const keys = { w: false, a: false, s: false, d: false };
+    const mouse = { x: 0, y: 0, worldX: 0, worldY: 0, down: false, justPressed: false, bufferClick: false };
+
+    // --- Cheat Codes ---
+    const cheatCode = ['arrowup', 'arrowup', 'arrowdown', 'arrowdown', 'arrowleft', 'arrowright', 'arrowleft', 'arrowright', 'b', 'a', 'enter'];
+    let cheatPos = 0;
+
+    const adminCheatCode = ['enter', 'a', 'b', 'arrowright', 'arrowleft', 'arrowright', 'arrowleft', 'arrowdown', 'arrowdown', 'arrowup', 'arrowup'];
+    let adminCheatPos = 0;
+
+    let forceEvent = 'None';
+    const EVENTS = ['None', 'Glitched', 'Space', 'Fallout'];
+    
+    function getActiveEvent() {
+        if (forceEvent !== 'None') return forceEvent;
+        const d = new Date();
+        if (d.getHours() % 2 === 0 && d.getMinutes() < 10) {
+            let cycle = (Math.floor(d.getHours() / 2)) % 3;
+            if (cycle === 0) return 'Glitched';
+            if (cycle === 1) return 'Space';
+            if (cycle === 2) return 'Fallout';
+        }
+        return 'None';
+    }
+
+    function formatTimeDiff(diffMs) {
+        let h = Math.floor(diffMs / 3600000);
+        let m = Math.floor((diffMs % 3600000) / 60000);
+        let s = Math.floor((diffMs % 60000) / 1000);
+        return `${h}h ${m}m ${s.toString().padStart(2, '0')}s`;
+    }
+
+    function updateEventScheduleUI() {
+        if (forceEvent !== 'None') {
+            document.getElementById('time-glitch').innerText = forceEvent === 'Glitched' ? "FORCED ACTIVE" : "--:--:--";
+            document.getElementById('time-space').innerText = forceEvent === 'Space' ? "FORCED ACTIVE" : "--:--:--";
+            document.getElementById('time-fallout').innerText = forceEvent === 'Fallout' ? "FORCED ACTIVE" : "--:--:--";
+            return;
+        }
+
+        const now = new Date();
+        const getNext = (offset) => { 
+            let t = new Date(now);
+            t.setMinutes(0, 0, 0);
+            if (t.getHours() % 2 === 0 && (Math.floor(t.getHours()/2)) % 3 === offset && now.getMinutes() < 10) return "ACTIVE NOW";
+            while(true) {
+                t.setHours(t.getHours() + 1);
+                if (t.getHours() % 2 === 0 && (Math.floor(t.getHours()/2)) % 3 === offset) return formatTimeDiff(t - now);
+            }
+        };
+
+        document.getElementById('time-glitch').innerText = getNext(0);
+        document.getElementById('time-space').innerText = getNext(1);
+        document.getElementById('time-fallout').innerText = getNext(2);
+    }
+
+    // Base Weapons
+    const defaultWeapon = { name: "Finger Paint", color: "#fff", range: 3, speed: 5, spread: 1.0, fireRate: 50, bulletSize: 15, bulletCount: 1, type: "paint", damage: 2, auto: true, desc: "You paint. With your fingers. Pretty self-explanatory." };
+
+    const baseWeaponPool = [
+        { id: "pistol", name: "Pistol", baseChance: 0.35, range: 25, speed: 12, spread: 0.05, fireRate: 250, bulletSize: 8, bulletCount: 1, type: "shoot", damage: 15, auto: false, desc: "A standard issue paintball pistol. Reliable sidearm." },
+        { id: "revolver", name: "Revolver", baseChance: 0.20, range: 35, speed: 18, spread: 0.01, fireRate: 500, bulletSize: 12, bulletCount: 1, type: "shoot", damage: 30, auto: false, desc: "This town ain't big enough for the ten of us." },
+        { id: "grenade", name: "Grenade", baseChance: 0.15, range: 20, speed: 8, spread: 0.1, fireRate: 800, bulletSize: 20, bulletCount: 1, type: "explosive", damage: 70, auto: false, desc: "\"Kaboom?\" \"Yes Rico, kaboom.\"" },
+        { id: "shotgun", name: "Shotgun", baseChance: 0.10, range: 14, speed: 10, spread: 0.35, fireRate: 700, bulletSize: 6, bulletCount: 8, type: "shoot", damage: 8, auto: false, desc: "Fires a scattered burst of paint. Devastating up close." },
+        { id: "painthrower", name: "Painthrower", baseChance: 0.05, range: 16, speed: 13, spread: 0.6, fireRate: 35, bulletSize: 10, bulletCount: 3, type: "shoot", damage: 2, auto: true, desc: "Hoses down enemies and the floor with a continuous stream." },
+        { id: "sniper", name: "Sniper", baseChance: 0.05, range: 70, speed: 30, spread: 0.005, fireRate: 1200, bulletSize: 16, bulletCount: 1, type: "shoot", damage: 80, auto: false, desc: "High-power precision rifle with extreme range." },
+        { id: "minigun", name: "Minigun", baseChance: 0.04, range: 35, speed: 18, spread: 0.15, fireRate: 75, bulletSize: 6, bulletCount: 1, type: "shoot", damage: 10, auto: true, desc: "It shoots bullets <i style='color:#00ffcc'>at the speed of light</i>." },
+        { id: "3xrocket", name: "3x Rockets", baseChance: 0.04, range: 45, speed: 12, spread: 0.2, fireRate: 1200, bulletSize: 20, bulletCount: 3, type: "explosive", damage: 100, auto: false, desc: "Fires a three-round burst of explosive projectiles." },
+        { id: "rpg", name: "RPG", baseChance: 0.02, range: 50, speed: 12, spread: 0.02, fireRate: 1500, bulletSize: 25, bulletCount: 1, type: "explosive", damage: 150, auto: false, desc: "Heavy shoulder-fired ordnance. Big boom." },
+        { id: "homing", name: "Homing Missile", baseChance: 0.03, range: 2400, speed: 8, spread: 0, fireRate: 2000, bulletSize: 30, bulletCount: 1, type: "homing", damage: 150, auto: false, desc: "Dear Whoever is in First Place: If you hate Mario Kart, then get off of this game. Sincerely, <i style='color:#ff0055'>{player}</i> And Their Homing Missile" },
+        { id: "crossover_box", name: "Crossover Box", baseChance: 0.015, range: 0, speed: 0, spread: 0, fireRate: 500, bulletSize: 0, bulletCount: 0, type: "crossover_box", damage: 0, auto: false, desc: "A mysterious glowing box. Click to open it and receive a random crossover item!" }
+    ];
+
+    const crossoverPool = [
+        { id: "blue_shell", name: "Blue Shell", chance: 0.39, range: 0, speed: 0, spread: 0, fireRate: 1000, bulletSize: 0, bulletCount: 0, type: "blue_shell", damage: 9999, auto: false, desc: "Instantly annihilates whoever is in 1st place and erases half their turf." },
+        { id: "paint_roller", name: "Paint Roller", chance: 0.30, range: 6, speed: 8, spread: 0.2, fireRate: 40, bulletSize: 25, bulletCount: 1, type: "paint", damage: 20, auto: true, desc: "Roll over the competition. Good range and excellent coverage." },
+        { id: "boomerang", name: "Boomerang", chance: 0.15, range: 18000, speed: 12, spread: 0, fireRate: 2000, bulletSize: 20, bulletCount: 1, type: "boomerang", damage: 1000, auto: false, desc: "Throw it and live in constant fear for the next 5 minutes." },
+        { id: "chug_jug", name: "Chug Jug", chance: 0.08, range: 0, speed: 0, spread: 0, fireRate: 1000, bulletSize: 0, bulletCount: 0, type: "chug_jug", damage: 0, auto: false, desc: "Restores all HP and grants 100 XP. Drink up!" },
+        { id: "octopus", name: "Octopus", chance: 0.05, range: 0, speed: 0, spread: 0, fireRate: 1000, bulletSize: 0, bulletCount: 0, type: "octopus", damage: 0, auto: false, desc: "Become an inkling! Hide and travel safely under your own paint." },
+        { id: "mega_roller", name: "Mega Paint Roller", chance: 0.02, range: 8, speed: 8, spread: 0.4, fireRate: 50, bulletSize: 60, bulletCount: 3, type: "paint", damage: 50, auto: true, desc: "A ridiculously massive paint roller. Squashes everything." },
+        { id: "mysterious_paper", name: "Mysterious Paper", chance: 0.01, range: 0, speed: 0, spread: 0, fireRate: 1000, bulletSize: 0, bulletCount: 0, type: "mysterious_paper", damage: 0, auto: false, desc: "Up, Up, Down, Down, Left, Right, Left, Right, B, A, Enter. You're welcome - use it wisely." }
+    ];
+
+    const baseTierPool = [
+        { name: "Mark I", color: "#aaaaaa", mult: 1.0, chance: 0.40 },   
+        { name: "Bronze", color: "#cd7f32", mult: 1.25, chance: 0.30 },  
+        { name: "Silver", color: "#e3e4e5", mult: 1.6, chance: 0.15 },   
+        { name: "Gold", color: "#ffd700", mult: 2.2, chance: 0.09 },     
+        { name: "Diamond", color: "#00ffff", mult: 3.5, chance: 0.059 },
+        { name: "Non-existent", color: "#000000", mult: 6.0, chance: 0.001 } 
+    ];
+
+    let teams = [];
+    const TEAM_RED = { id: 'Red', color: '#ff0055', hex: [255, 0, 85] };
+    const TEAM_BLUE = { id: 'Blue', color: '#0088ff', hex: [0, 136, 255] };
+    
+    const FFA_TEAMS = [
+        TEAM_RED, TEAM_BLUE,
+        { id: 'Yellow', color: '#ffcc00', hex: [255, 204, 0] },
+        { id: 'Green', color: '#00cc44', hex: [0, 204, 68] },
+        { id: 'Purple', color: '#9900ff', hex: [153, 0, 255] },
+        { id: 'Orange', color: '#ff6600', hex: [255, 102, 0] },
+        { id: 'Pink', color: '#ff66cc', hex: [255, 102, 204] },
+        { id: 'Cyan', color: '#00ffff', hex: [0, 255, 255] },
+        { id: 'White', color: '#ffffff', hex: [255, 255, 255] }, 
+        { id: 'Lime', color: '#ccff00', hex: [204, 255, 0] }   
+    ];
+
+    function generateMap() {
+        walls = [];
+        walls.push({ x: -100, y: -100, w: mapWidth + 200, h: 100 }, { x: -100, y: mapHeight, w: mapWidth + 200, h: 100 });
+        walls.push({ x: -100, y: 0, w: 100, h: mapHeight }, { x: mapWidth, y: 0, w: 100, h: mapHeight });
+
+        for (let i = 0; i < 45; i++) {
+            let isSquare = Math.random() < 0.25;
+            let w = isSquare ? 100 + Math.random()*150 : (Math.random() > 0.5 ? 50 : 200 + Math.random()*400);
+            let h = isSquare ? w : (w === 50 ? 200 + Math.random()*400 : 50);
+            
+            let wx = Math.random() * (mapWidth - w);
+            let wy = Math.random() * (mapHeight - h);
+            
+            if (ctfActive || gameMode !== 'ffa') {
+                if (wx < 400 || wx > mapWidth - 400) continue; 
+            }
+            walls.push({ x: wx, y: wy, w: w, h: h });
+        }
+    }
+
+    function checkWallCollision(x, y, radius) {
+        if (x - radius < 0 || x + radius > mapWidth || y - radius < 0 || y + radius > mapHeight) return true;
+        for (let w of walls) {
+            if (x + radius < w.x || x - radius > w.x + w.w || y + radius < w.y || y - radius > w.y + w.h) continue; 
+            let testX = Math.max(w.x, Math.min(x, w.x + w.w));
+            let testY = Math.max(w.y, Math.min(y, w.y + w.h));
+            if (Math.hypot(x - testX, y - testY) <= radius) return true;
+        }
+        return false;
+    }
+
+    function getValidSpawn(zone = 'any') {
+        let x, y;
+        do { 
+            if (zone === 'left') x = Math.random() * 800 + 50;
+            else if (zone === 'right') x = Math.random() * 800 + (mapWidth - 850);
+            else x = Math.random() * (mapWidth - 100) + 50;
+            
+            y = Math.random() * (mapHeight - 100) + 50; 
+        } while (checkWallCollision(x, y, 20));
+        return {x, y};
+    }
+
+    function initGame() {
+        playerData.username = document.getElementById('username-input').value.trim() || 'Player';
+        localStorage.setItem('paintSplatSave', JSON.stringify(playerData));
+        gameMode = document.getElementById('mode-select').value;
+        ctfActive = (gameMode === 'ctf');
+
+        players = []; projectiles = []; chests = []; droppedItems = []; cheatPos = 0; adminCheatPos = 0;
+        liveRankings = []; lastLiveScoreCalc = 0; ctfFlags = [];
+        ctfScores = { Red: 0, Blue: 0 };
+        mouse.bufferClick = false; mouse.justPressed = false;
+        
+        teams.length = 0;
+        let count = 0;
+        
+        if (gameMode === 'ffa') {
+            teams.push(...FFA_TEAMS);
+        } else {
+            teams.push(TEAM_RED, TEAM_BLUE);
+            if (gameMode === '1v1') count = 1;
+            else if (gameMode === '5v5' || ctfActive) count = 5;
+            else if (gameMode === '15v15') count = 15;
+            else if (gameMode === '30v30') count = 30;
+            else if (gameMode === '50v50') count = 50;
+        }
+
+        generateMap();
+        
+        if (gameMode === 'ffa') {
+            for(let i = 0; i < teams.length; i++) {
+                let s = getValidSpawn('any');
+                players.push({
+                    isAI: i !== 0, name: i === 0 ? playerData.username : getRandomName(),
+                    x: s.x, y: s.y, spawnX: s.x, spawnY: s.y, radius: 15,
+                    speed: i === 0 ? 5.5 : 4.0, team: teams[i],
+                    inventory: [defaultWeapon, null, null, null], currentSlot: 0, lastFire: 0, hp: 100,
+                    skill: i === 0 ? 'player' : BOT_SKILLS[Math.floor(Math.random() * BOT_SKILLS.length)],
+                    targetX: s.x, targetY: s.y, decisionTimer: 0, xpEarned: 0, kills: 0, deaths: 0,
+                    hasOctopus: false, isHidden: false
+                });
+            }
+        } else {
+            for(let t = 0; t < 2; t++) {
+                let isRed = (t === 0);
+                for(let i = 0; i < count; i++) {
+                    let s = getValidSpawn(isRed ? 'left' : 'right');
+                    let isPlayer = (isRed && i === 0);
+                    players.push({
+                        isAI: !isPlayer, name: isPlayer ? playerData.username : getRandomName(),
+                        x: s.x, y: s.y, spawnX: s.x, spawnY: s.y, radius: 15,
+                        speed: isPlayer ? 5.5 : 4.0, team: teams[t],
+                        inventory: [defaultWeapon, null, null, null], currentSlot: 0, lastFire: 0, hp: 100,
+                        skill: isPlayer ? 'player' : BOT_SKILLS[Math.floor(Math.random() * BOT_SKILLS.length)],
+                        targetX: s.x, targetY: s.y, decisionTimer: 0, xpEarned: 0, kills: 0, deaths: 0,
+                        hasOctopus: false, isHidden: false
+                    });
+                }
+            }
+        }
+
+        if (gameMode !== 'ffa') {
+            let blixer = players.find(p => p.name === 'Blixer');
+            let antiBlixer = players.find(p => p.name === 'ImComingForYou_Blixer');
+
+            if (blixer && antiBlixer && blixer.team.id === antiBlixer.team.id) {
+                let swapBot = players.find(p => p.team.id !== blixer.team.id && p.isAI);
+                if (swapBot) {
+                    if (!antiBlixer.isAI) {
+                        let temp = blixer.name;
+                        blixer.name = swapBot.name;
+                        swapBot.name = temp;
+                    } else {
+                        let temp = antiBlixer.name;
+                        antiBlixer.name = swapBot.name;
+                        swapBot.name = temp;
+                    }
+                }
+            }
+        }
+
+        if (ctfActive) {
+            ctfFlags.push({ team: TEAM_RED, x: 200, y: mapHeight/2, startX: 200, startY: mapHeight/2, carrier: null, color: TEAM_RED.color });
+            ctfFlags.push({ team: TEAM_BLUE, x: mapWidth - 200, y: mapHeight/2, startX: mapWidth - 200, startY: mapHeight/2, carrier: null, color: TEAM_BLUE.color });
+            document.getElementById('ctf-score-display').style.display = 'flex';
+        } else {
+            document.getElementById('ctf-score-display').style.display = 'none';
+        }
+
+        let chestCount = gameMode === '50v50' ? 80 : 40;
+        for(let i=0; i<chestCount; i++) spawnChest();
+        
+        paintCtx.clearRect(0,0, mapWidth, mapHeight);
+        updateLiveScores(); 
+        updateHUD();
+    }
+
+    function spawnChest() {
+        let s = getValidSpawn('any'); chests.push({ x: s.x, y: s.y, radius: 18 });
+    }
+
+    function rollLoot() {
+        let activeEvent = getActiveEvent();
+        let curWeapons = [...baseWeaponPool];
+        let curTiers = [...baseTierPool];
+
+        if (activeEvent === 'Glitched') {
+            curTiers.push({ name: "Glitched", color: "#ff00ff", mult: 4.5, chance: 0.015 });
+            curWeapons.push({ id: "railgun", name: "Railgun", baseChance: 0.03, range: 120, speed: 50, spread: 0.001, fireRate: 900, bulletSize: 12, bulletCount: 1, type: "shoot", damage: 120, auto: false, desc: "Experimental tech. Fires a hyper-velocity slug across the map." });
+        }
+        if (activeEvent === 'Space') {
+            curTiers.push({ name: "Galaxy", color: "#9933ff", mult: 4.0, chance: 0.02 });
+            curWeapons.push({ id: "5xrocket", name: "Giant 5x Rockets", baseChance: 0.03, range: 60, speed: 10, spread: 0.35, fireRate: 1500, bulletSize: 40, bulletCount: 5, type: "explosive", damage: 140, auto: false, desc: "Space-age weaponry. Launches a massive five-rocket barrage." });
+        }
+        if (activeEvent === 'Fallout') {
+            curTiers.push({ name: "Poison", color: "#33ff33", mult: 2.8, chance: 0.05 });
+            curWeapons.push({ id: "nuke", name: "NUKE", baseChance: 0.001, range: 10, speed: 0, spread: 0, fireRate: 9999, bulletSize: 0, bulletCount: 1, type: "nuke", damage: 9999, auto: false, desc: "There's a bomb at -45.29044,140.89544" });
+        }
+
+        let totalWChance = curWeapons.reduce((sum, w) => sum + w.baseChance, 0);
+        let wRoll = Math.random() * totalWChance, wSum = 0, baseW = curWeapons[0];
+        for(let w of curWeapons) { wSum += w.baseChance; if(wRoll <= wSum) { baseW = w; break; } }
+        
+        let totalTChance = curTiers.reduce((sum, t) => sum + t.chance, 0);
+        let tRoll = Math.random() * totalTChance, tSum = 0, tier = curTiers[0];
+        for(let t of curTiers) { tSum += t.chance; if(tRoll <= tSum) { tier = t; break; } }
+
+        return {
+            name: `${tier.name} ${baseW.name}`, color: tier.color,
+            range: baseW.range * (1 + (tier.mult-1)*0.5), speed: baseW.speed * (1 + (tier.mult-1)*0.3),
+            spread: baseW.spread / tier.mult, fireRate: baseW.fireRate / tier.mult,
+            bulletSize: baseW.bulletSize * Math.pow(tier.mult, 0.6), bulletCount: baseW.bulletCount,
+            type: baseW.type, damage: baseW.damage * tier.mult, auto: baseW.auto, desc: baseW.desc
+        };
+    }
+
+    function triggerWeaponCheat() {
+        const allWeapons = [ ...baseWeaponPool, ...crossoverPool, 
+            { id: "railgun", name: "Railgun", range: 120, speed: 50, spread: 0.001, fireRate: 900, bulletSize: 12, bulletCount: 1, type: "shoot", damage: 120, auto: false, desc: "Experimental tech. Fires a hyper-velocity slug across the map." },
+            { id: "5xrocket", name: "Giant 5x Rockets", range: 60, speed: 10, spread: 0.35, fireRate: 1500, bulletSize: 40, bulletCount: 5, type: "explosive", damage: 140, auto: false, desc: "Space-age weaponry. Launches a massive five-rocket barrage." },
+            { id: "nuke", name: "NUKE", range: 10, speed: 0, spread: 0, fireRate: 9999, bulletSize: 0, bulletCount: 1, type: "nuke", damage: 9999, auto: false, desc: "There's a bomb at -45.29044,140.89544" }
+        ];
+
+        const allTiers = [ ...baseTierPool,
+            { name: "Glitched", color: "#ff00ff", mult: 4.5 },
+            { name: "Galaxy", color: "#9933ff", mult: 4.0 },
+            { name: "Poison", color: "#33ff33", mult: 2.8 }
+        ];
+
+        let wInput = prompt("CHEAT ACTIVATED!\nEnter Weapon ID (pistol, revolver, shotgun, sniper, grenade, rpg, minigun, homing, 3xrocket, painthrower, crossover_box, blue_shell, boomerang, chug_jug, octopus, paint_roller, mega_roller, railgun, 5xrocket, nuke, mysterious_paper):", "crossover_box");
+        if (!wInput) { lastTime = Date.now(); return; }
+        
+        let tInput = prompt("Enter Tier (Mark I, Bronze, Silver, Gold, Diamond, Glitched, Galaxy, Poison, Non-existent):", "Diamond");
+        if (!tInput) { lastTime = Date.now(); return; }
+
+        let foundW = allWeapons.find(w => w.id.toLowerCase() === wInput.toLowerCase());
+        let foundT = allTiers.find(t => t.name.toLowerCase() === tInput.toLowerCase());
+
+        if (foundW && foundT) {
+            let cheatW = {
+                name: `${foundT.name} ${foundW.name}`, color: foundT.color,
+                range: foundW.range * (1 + (foundT.mult-1)*0.5), speed: foundW.speed * (1 + (foundT.mult-1)*0.3),
+                spread: foundW.spread / foundT.mult, fireRate: foundW.fireRate / foundT.mult,
+                bulletSize: foundW.bulletSize * Math.pow(foundT.mult, 0.6), bulletCount: foundW.bulletCount,
+                type: foundW.type, damage: foundW.damage * foundT.mult, auto: foundW.auto, desc: foundW.desc
+            };
+            
+            droppedItems.push({ x: players[0].x, y: players[0].y + 25, weapon: cheatW, radius: 15 });
+            alert(`SUCCESS: [${cheatW.name}] has been dropped at your feet!`);
+        } else {
+            alert("CHEAT FAILED: Invalid weapon ID or tier name.");
+        }
+        lastTime = Date.now(); 
+    }
+
+    function triggerAdminCheat() {
+        const allWeapons = [ ...baseWeaponPool, ...crossoverPool, 
+            { id: "railgun", name: "Railgun", range: 120, speed: 50, spread: 0.001, fireRate: 900, bulletSize: 12, bulletCount: 1, type: "shoot", damage: 120, auto: false, desc: "Experimental tech. Fires a hyper-velocity slug across the map." },
+            { id: "5xrocket", name: "Giant 5x Rockets", range: 60, speed: 10, spread: 0.35, fireRate: 1500, bulletSize: 40, bulletCount: 5, type: "explosive", damage: 140, auto: false, desc: "Space-age weaponry. Launches a massive five-rocket barrage." },
+            { id: "nuke", name: "NUKE", range: 10, speed: 0, spread: 0, fireRate: 9999, bulletSize: 0, bulletCount: 1, type: "nuke", damage: 9999, auto: false, desc: "There's a bomb at -45.29044,140.89544" }
+        ];
+
+        const allTiers = [ ...baseTierPool,
+            { name: "Glitched", color: "#ff00ff", mult: 4.5 },
+            { name: "Galaxy", color: "#9933ff", mult: 4.0 },
+            { name: "Poison", color: "#33ff33", mult: 2.8 }
+        ];
+
+        let tgtInput = prompt("GLOBAL OVERRIDE ACTIVATED!\nEnter target Player or AI name:", players[0].name);
+        if (!tgtInput) { lastTime = Date.now(); return; }
+
+        let targetEnt = players.find(p => p.name.toLowerCase() === tgtInput.toLowerCase());
+        if (!targetEnt) {
+            alert("ADMIN FAILED: Could not find player/AI in the match.");
+            lastTime = Date.now(); return;
+        }
+
+        let wInput = prompt(`Targeting: ${targetEnt.name}\nEnter Weapon ID:`, "nuke");
+        if (!wInput) { lastTime = Date.now(); return; }
+        
+        let tInput = prompt("Enter Tier:", "Non-existent");
+        if (!tInput) { lastTime = Date.now(); return; }
+
+        let foundW = allWeapons.find(w => w.id.toLowerCase() === wInput.toLowerCase());
+        let foundT = allTiers.find(t => t.name.toLowerCase() === tInput.toLowerCase());
+
+        if (foundW && foundT) {
+            let cheatW = {
+                name: `${foundT.name} ${foundW.name}`, color: foundT.color,
+                range: foundW.range * (1 + (foundT.mult-1)*0.5), speed: foundW.speed * (1 + (foundT.mult-1)*0.3),
+                spread: foundW.spread / foundT.mult, fireRate: foundW.fireRate / foundT.mult,
+                bulletSize: foundW.bulletSize * Math.pow(foundT.mult, 0.6), bulletCount: foundW.bulletCount,
+                type: foundW.type, damage: foundW.damage * foundT.mult, auto: foundW.auto, desc: foundW.desc
+            };
+            
+            let slot = targetEnt.inventory.findIndex(w => w === null);
+            if (slot === -1) slot = targetEnt.currentSlot === 0 ? 1 : targetEnt.currentSlot;
+            targetEnt.inventory[slot] = cheatW;
+            targetEnt.currentSlot = slot;
+            
+            if (!targetEnt.isAI && targetEnt === players[0]) updateHUD();
+            
+            alert(`ADMIN SUCCESS: Forced [${cheatW.name}] directly into ${targetEnt.name}'s hands!`);
+        } else {
+            alert("ADMIN FAILED: Invalid weapon ID or tier name.");
+        }
+        lastTime = Date.now(); 
+    }
+
+    function triggerNuke(entity) {
+        const flash = document.getElementById('nuke-flash');
+        flash.style.opacity = 1;
+        setTimeout(() => flash.style.opacity = 0, 150);
+
+        for(let i=0; i<400; i++) {
+            paintFloor(Math.random()*mapWidth, Math.random()*mapHeight, 100 + Math.random()*150, entity.team.color, false);
+        }
+
+        players.forEach(p => {
+            if (p.team.id !== entity.team.id && p.hp > 0) {
+                p.hp -= 9999;
+                entity.kills++;
+                if(entity.name === players[0].name) players[0].xpEarned += 50;
+                killPlayer(p);
+            }
+        });
+    }
+
+    function eraseTurf(team, fraction) {
+        const imgData = paintCtx.getImageData(0, 0, mapWidth, mapHeight);
+        const data = imgData.data;
+        for (let i = 0; i < data.length; i += 4) {
+            if (data[i+3] > 50) {
+                if (Math.abs(data[i] - team.hex[0]) < 10 && Math.abs(data[i+1] - team.hex[1]) < 10 && Math.abs(data[i+2] - team.hex[2]) < 10) {
+                    if (Math.random() < fraction) data[i+3] = 0; 
+                }
+            }
+        }
+        paintCtx.putImageData(imgData, 0, 0);
+        updateLiveScores();
+    }
+
+    function killPlayer(p) {
+        p.deaths++;
+        p.hasOctopus = false;
+        p.isHidden = false;
+        
+        if (ctfActive) {
+            let f = ctfFlags.find(flag => flag.carrier === p);
+            if (f) f.carrier = null;
+        }
+
+        for (let j = 1; j < 4; j++) {
+            if (p.inventory[j]) {
+                droppedItems.push({ x: p.x + (Math.random()-0.5)*40, y: p.y + (Math.random()-0.5)*40, weapon: p.inventory[j], radius: 12 });
+                p.inventory[j] = null;
+            }
+        }
+        if (Math.random() < 0.5) droppedItems.push({ x: p.x, y: p.y, weapon: rollLoot(), radius: 12 });
+        
+        let newSpawn = getValidSpawn(gameMode === 'ffa' ? 'any' : (p.team.id === 'Red' ? 'left' : 'right'));
+        p.hp = 100; p.x = newSpawn.x; p.y = newSpawn.y; p.spawnX = newSpawn.x; p.spawnY = newSpawn.y;
+        p.currentSlot = 0;
+        if(!p.isAI) updateHUD();
+    }
+
+    function updateLiveScores() {
+        const endCtx = paintLayer.getContext('2d', { willReadFrequently: true });
+        const imgData = endCtx.getImageData(0, 0, mapWidth, mapHeight).data;
+        let scores = Array(teams.length).fill(0), totalPainted = 0;
+        
+        for (let i = 0; i < imgData.length; i += 64) { 
+            let r = imgData[i], g = imgData[i+1], b = imgData[i+2], a = imgData[i+3];
+            if (a > 50) {
+                for(let t=0; t<teams.length; t++) {
+                    if (Math.abs(r - teams[t].hex[0]) < 10 && Math.abs(g - teams[t].hex[1]) < 10 && Math.abs(b - teams[t].hex[2]) < 10) {
+                        scores[t]++; totalPainted++; break;
+                    }
+                }
+            }
+        }
+
+        if (gameMode === 'ffa') {
+            liveRankings = players.map((p, idx) => ({ 
+                name: p.name, color: p.team.color, 
+                percent: totalPainted === 0 ? 0 : ((scores[idx] / totalPainted) * 100)
+            })).sort((a, b) => b.percent - a.percent); 
+        } else {
+            liveRankings = teams.map((t, idx) => ({ 
+                name: t.id + ' Team', color: t.color, 
+                percent: totalPainted === 0 ? 0 : ((scores[idx] / totalPainted) * 100)
+            })).sort((a, b) => b.percent - a.percent); 
+        }
+        
+        let html = '<h3 style="margin:0 0 10px 0; font-size:1rem; color:#00ffcc; text-transform:uppercase;">Live Standings</h3>';
+        
+        if (ctfActive) {
+            document.getElementById('ctf-red').innerText = `RED: ${ctfScores.Red}`;
+            document.getElementById('ctf-blue').innerText = `BLUE: ${ctfScores.Blue}`;
+        }
+
+        liveRankings.slice(0, 10).forEach((r, i) => { 
+            html += `<div class="live-row" style="color:${r.color}"><span>${i+1}. ${r.name}</span><span>${r.percent.toFixed(1)}%</span></div>`;
+        });
+        document.getElementById('live-leaderboard').innerHTML = html;
+    }
+
+    function startGame() {
+        document.getElementById('main-menu').classList.add('hidden');
+        document.getElementById('hud').classList.remove('hidden');
+        document.getElementById('timer-display').classList.remove('hidden');
+        document.getElementById('event-timers').classList.remove('hidden');
+        document.getElementById('live-leaderboard').classList.remove('hidden');
+        initGame(); isPlaying = true; lastTime = Date.now();
+    }
+    
+    function endGame() {
+        isPlaying = false;
+        document.getElementById('hud').classList.add('hidden'); 
+        document.getElementById('timer-display').classList.add('hidden');
+        document.getElementById('event-timers').classList.add('hidden');
+        document.getElementById('live-leaderboard').classList.add('hidden');
+        document.getElementById('ctf-score-display').style.display = 'none';
+        document.getElementById('game-over').classList.remove('hidden'); 
+        calculateScores();
+    }
+
+    window.addEventListener('mousedown', (e) => {
+        if (!mouse.down) mouse.bufferClick = true;
+        mouse.down = true;
+    });
+
+    window.addEventListener('mouseup', () => { mouse.down = false; });
+
+    window.addEventListener('keydown', (e) => {
+        if(document.activeElement.id === 'username-input') return;
+
+        let keyLow = e.key.toLowerCase();
+        
+        // Original Konami cheat
+        if (keyLow === cheatCode[cheatPos]) {
+            cheatPos++;
+            if (cheatPos === cheatCode.length) { triggerWeaponCheat(); cheatPos = 0; }
+        } else {
+            cheatPos = 0;
+            if (keyLow === cheatCode[0]) cheatPos = 1;
+        }
+
+        // Admin Override cheat
+        if (keyLow === adminCheatCode[adminCheatPos]) {
+            adminCheatPos++;
+            if (adminCheatPos === adminCheatCode.length) { triggerAdminCheat(); adminCheatPos = 0; }
+        } else {
+            adminCheatPos = 0;
+            if (keyLow === adminCheatCode[0]) adminCheatPos = 1;
+        }
+
+        if (keyLow === '`') { 
+            let nextIdx = (EVENTS.indexOf(forceEvent) + 1) % EVENTS.length;
+            forceEvent = EVENTS[nextIdx];
+        }
+
+        if (!isPlaying) return; if (keys.hasOwnProperty(keyLow)) keys[keyLow] = true;
+        const keyMap = {'1':0, '2':1, '3':2, '4':3};
+        if (keyLow in keyMap && players[0].inventory[keyMap[keyLow]] !== null) { players[0].currentSlot = keyMap[keyLow]; updateHUD(); }
+    });
+    window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false; });
+    window.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
+    window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+
+    function updateHUD() {
+        let p = players[0];
+        for(let i=0; i<4; i++) {
+            let el = document.getElementById(`inv-${i}`);
+            let nameSpan = document.getElementById(`inv-name-${i}`);
+            let tip = document.getElementById(`tip-${i}`);
+            
+            el.classList.remove('active');
+            if (i === p.currentSlot) el.classList.add('active');
+            
+            if (p.inventory[i]) { 
+                let w = p.inventory[i];
+                nameSpan.innerText = `[${i+1}] ${w.name}`; 
+                el.style.borderBottomColor = w.color; 
+                
+                let stats = `DMG: ${w.damage.toFixed(1)} | RNG: ${w.range.toFixed(0)}<br>ROF: ${(1000/w.fireRate).toFixed(1)}/s | SHOTS: ${w.bulletCount}`;
+                let replacedDesc = w.desc.replace('{player}', p.name);
+                tip.innerHTML = `<strong style="color:${w.color}; font-size:1.1em;">${w.name}</strong><br>${stats}<br><br><span style="color:#aaa">${replacedDesc}</span>`;
+            } else { 
+                nameSpan.innerText = `[${i+1}] Empty`; 
+                el.style.borderBottomColor = '#555'; 
+                tip.innerHTML = "Empty Slot";
+            }
+        }
+        
+        const hpFill = document.getElementById('health-bar-fill'), hpText = document.getElementById('health-text');
+        hpFill.style.width = `${Math.max(0, p.hp)}%`; hpText.innerText = `${Math.ceil(p.hp)} / 100 HP`;
+        hpFill.style.backgroundColor = p.hp > 50 ? '#00ff88' : (p.hp > 20 ? '#ffbb00' : '#ff3366');
+
+        let needed = playerData.level * 1000;
+        let xpPerc = Math.min(100, (playerData.xp / needed) * 100);
+        document.getElementById('xp-bar-fill').style.width = `${xpPerc}%`;
+        document.getElementById('xp-text').innerText = `Lvl ${playerData.level} (${Math.floor(playerData.xp)}/${needed})`;
+    }
+
+    function update() {
+        if (!isPlaying) return;
+        const now = Date.now(), dt = (now - lastTime) / 1000; lastTime = now;
+        timeLeft -= dt; chestSpawnTimer += dt;
+        
+        mouse.justPressed = mouse.bufferClick;
+        mouse.bufferClick = false;
+        
+        if(chestSpawnTimer > (gameMode === '50v50' ? 4 : 8)) { spawnChest(); chestSpawnTimer = 0; }
+        if(now - lastLiveScoreCalc > 2000) { updateLiveScores(); lastLiveScoreCalc = now; }
+        
+        let activeEvent = getActiveEvent();
+        updateEventScheduleUI();
+
+        if (activeEvent !== lastHandledEvent) {
+            if (activeEvent === 'Glitched') { eventAudio.src = 'https://cdn.jsdelivr.net/gh/Nathan803188/soundtracks@main/Danimal%20Cannon%20-%20Long%20Live%20The%20New%20Fresh.mp3'; eventAudio.play(); bgm.pause(); }
+            else if (activeEvent === 'Space') { eventAudio.src = 'https://cdn.jsdelivr.net/gh/Nathan803188/soundtracks@main/Dimrain47%20-%20(13)%20Surface.mp3'; eventAudio.play(); bgm.pause(); }
+            else if (activeEvent === 'Fallout') { eventAudio.src = 'https://cdn.jsdelivr.net/gh/Nathan803188/soundtracks@main/fallout.ogg'; eventAudio.play(); bgm.pause(); }
+            else { 
+                eventAudio.pause(); 
+                if (document.getElementById('radio-play-btn').innerText === '⏸') bgm.play().catch(()=>{}); 
+            }
+            lastHandledEvent = activeEvent;
+            updateRadioUI();
+        }
+        
+        document.getElementById('time-text').innerText = `${Math.floor(Math.max(0, timeLeft) / 60)}:${Math.floor(Math.max(0, timeLeft) % 60).toString().padStart(2, '0')}`;
+        
+        let banner = document.getElementById('event-banner');
+        if (activeEvent !== 'None') {
+            banner.style.display = 'block'; banner.innerText = `${activeEvent} EVENT ACTIVE!`;
+            if(activeEvent === 'Fallout') banner.style.color = '#33ff33';
+            else if(activeEvent === 'Space') banner.style.color = '#9933ff';
+            else if(activeEvent === 'Glitched') banner.style.color = '#ff00ff';
+        } else { banner.style.display = 'none'; }
+
+        if (timeLeft <= 0) { endGame(); return; }
+
+        mouse.worldX = mouse.x + camera.x; mouse.worldY = mouse.y + camera.y;
+
+        if (ctfActive) {
+            ctfFlags.forEach(f => {
+                if (f.carrier) {
+                    f.x = f.carrier.x; f.y = f.carrier.y - 15; 
+                    
+                    let baseDestX = f.carrier.team.id === 'Red' ? 200 : mapWidth - 200;
+                    if (Math.hypot(f.x - baseDestX, f.y - (mapHeight/2)) < 60) {
+                        ctfScores[f.carrier.team.id]++;
+                        f.carrier.xpEarned += 200;
+                        f.carrier = null;
+                        f.x = f.startX; f.y = f.startY;
+                        updateLiveScores();
+                    }
+                } else {
+                    for (let p of players) {
+                        if (p.hp > 0 && Math.hypot(p.x - f.x, p.y - f.y) < p.radius + 20) {
+                            if (p.team.id !== f.team.id) {
+                                f.carrier = p; break;
+                            } else if (f.x !== f.startX || f.y !== f.startY) {
+                                f.x = f.startX; f.y = f.startY; break;
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        players.forEach(p => {
+            p.isHidden = false;
+            if (p.hasOctopus) {
+                let px = Math.floor(Math.max(0, Math.min(mapWidth - 1, p.x)));
+                let py = Math.floor(Math.max(0, Math.min(mapHeight - 1, p.y)));
+                let pixel = paintCtx.getImageData(px, py, 1, 1).data;
+                if (pixel[3] > 50 && Math.abs(pixel[0] - p.team.hex[0]) < 10 && Math.abs(pixel[1] - p.team.hex[1]) < 10 && Math.abs(pixel[2] - p.team.hex[2]) < 10) {
+                    p.isHidden = true;
+                }
+            }
+            let currentSpeed = p.speed * (p.isHidden ? 1.5 : 1.0);
+
+            if (!p.isAI) {
+                let nextX = p.x, nextY = p.y;
+                if (keys.w) nextY -= currentSpeed; if (keys.s) nextY += currentSpeed;
+                if (keys.a) nextX -= currentSpeed; if (keys.d) nextX += currentSpeed;
+                if (!checkWallCollision(nextX, p.y, p.radius)) p.x = nextX;
+                if (!checkWallCollision(p.x, nextY, p.radius)) p.y = nextY;
+
+                let activeW = p.inventory[p.currentSlot];
+                if (activeW) {
+                    let attemptFire = activeW.auto ? mouse.down : mouse.justPressed;
+                    if (attemptFire && now - p.lastFire >= activeW.fireRate) { 
+                        fireWeapon(p, activeW, Math.atan2(mouse.worldY - p.y, mouse.worldX - p.x), activeEvent); 
+                        p.lastFire = now; 
+                    }
+                }
+
+                camera.x = Math.max(0, Math.min(p.x - canvas.width / 2, mapWidth - canvas.width));
+                camera.y = Math.max(0, Math.min(p.y - canvas.height / 2, mapHeight - canvas.height));
+            } else {
+                let vendettaTarget = null;
+                if (p.name === 'Blixer' || p.name === 'ImComingForYou_Blixer') {
+                    let nemesisName = p.name === 'Blixer' ? 'ImComingForYou_Blixer' : 'Blixer';
+                    vendettaTarget = players.find(other => other.name === nemesisName && other.hp > 0);
+                    if(vendettaTarget && vendettaTarget.team.id === p.team.id) vendettaTarget = null; 
+                }
+
+                p.decisionTimer -= dt;
+                
+                if (p.decisionTimer <= 0 && !vendettaTarget) {
+                    if (ctfActive) {
+                        let carrying = ctfFlags.find(f => f.carrier === p);
+                        if (carrying) {
+                            p.targetX = p.team.id === 'Red' ? 200 : mapWidth - 200;
+                            p.targetY = mapHeight / 2;
+                        } else if (Math.random() < 0.6) {
+                            let eFlag = ctfFlags.find(f => f.team.id !== p.team.id);
+                            p.targetX = eFlag.x; p.targetY = eFlag.y;
+                        } else {
+                            p.targetX = p.x + (Math.random() - 0.5) * 600; p.targetY = p.y + (Math.random() - 0.5) * 600;
+                        }
+                    } else {
+                        p.targetX = p.x + (Math.random() - 0.5) * 600; p.targetY = p.y + (Math.random() - 0.5) * 600;
+                    }
+                    
+                    let weapons = p.inventory.map((w,i) => w !== null ? i : -1).filter(i => i !== -1);
+                    p.currentSlot = weapons[Math.floor(Math.random() * weapons.length)];
+                    p.decisionTimer = 2 + Math.random() * 2;
+                }
+
+                let closestE = null, closestDist = Infinity;
+                
+                if (vendettaTarget) {
+                    closestE = vendettaTarget;
+                    closestDist = Math.hypot(vendettaTarget.x - p.x, vendettaTarget.y - p.y);
+                } else {
+                    for (let other of players) {
+                        if (other.team.id !== p.team.id && other.hp > 0) {
+                            let d = Math.hypot(other.x - p.x, other.y - p.y);
+                            if (d < closestDist) { closestDist = d; closestE = other; }
+                        }
+                    }
+                }
+
+                let aimAngle = Math.atan2(p.targetY - p.y, p.targetX - p.x);
+                let shouldFire = false;
+
+                if (vendettaTarget) {
+                    if (p.decisionTimer <= 0) {
+                        p.targetX = vendettaTarget.x + (Math.random()-0.5)*300; 
+                        p.targetY = vendettaTarget.y + (Math.random()-0.5)*300;
+                        p.decisionTimer = 1;
+                    }
+                    aimAngle = Math.atan2(vendettaTarget.y - p.y, vendettaTarget.x - p.x);
+                    if (closestDist < 1200) shouldFire = true;
+                } else if (closestE && closestDist < 800) {
+                    aimAngle = Math.atan2(closestE.y - p.y, closestE.x - p.x);
+                    if (p.skill === 'noob') {
+                        aimAngle += (Math.random() - 0.5) * 0.8; shouldFire = Math.random() < 0.3;
+                    } else if (p.skill === 'average') {
+                        aimAngle += (Math.random() - 0.5) * 0.2; shouldFire = true;
+                    } else if (p.skill === 'pro') {
+                        shouldFire = true;
+                        if (Math.random() < 0.05) { p.targetX = p.x + (Math.random() - 0.5)*300; p.targetY = p.y + (Math.random() - 0.5)*300; p.decisionTimer = 1;} 
+                    }
+                } else if (p.skill !== 'noob' && Math.random() < 0.02) shouldFire = true; 
+
+                if (Math.hypot(p.targetX - p.x, p.targetY - p.y) > currentSpeed) {
+                    let moveAngle = Math.atan2(p.targetY - p.y, p.targetX - p.x);
+                    let nx = p.x + Math.cos(moveAngle) * currentSpeed, ny = p.y + Math.sin(moveAngle) * currentSpeed;
+                    if (!checkWallCollision(nx, ny, p.radius)) { p.x = nx; p.y = ny; } else p.decisionTimer = 0;
+                }
+
+                let activeW = p.inventory[p.currentSlot];
+                if (activeW && shouldFire && now - p.lastFire >= activeW.fireRate) { 
+                    fireWeapon(p, activeW, aimAngle, activeEvent); 
+                    p.lastFire = now; 
+                }
+            }
+
+            for (let i = chests.length - 1; i >= 0; i--) {
+                if (Math.hypot(p.x - chests[i].x, p.y - chests[i].y) < p.radius + chests[i].radius) {
+                    let loot = rollLoot();
+                    let slot = p.inventory.findIndex(w => w === null); if (slot === -1) slot = p.currentSlot === 0 ? 1 : p.currentSlot;
+                    p.inventory[slot] = loot; p.currentSlot = slot;
+                    
+                    if(!p.isAI) { p.xpEarned += 10; updateHUD(); }
+                    chests.splice(i, 1);
+                }
+            }
+
+            for (let i = droppedItems.length - 1; i >= 0; i--) {
+                if (Math.hypot(p.x - droppedItems[i].x, p.y - droppedItems[i].y) < p.radius + droppedItems[i].radius) {
+                    let slot = p.inventory.findIndex(w => w === null); if (slot === -1) slot = p.currentSlot === 0 ? 1 : p.currentSlot;
+                    p.inventory[slot] = droppedItems[i].weapon; p.currentSlot = slot;
+                    
+                    if(!p.isAI) { p.xpEarned += 5; updateHUD(); }
+                    droppedItems.splice(i, 1);
+                }
+            }
+        });
+
+        for (let i = projectiles.length - 1; i >= 0; i--) {
+            let pr = projectiles[i]; 
+
+            if (pr.type === 'boomerang') {
+                pr.frame = (pr.frame || 0) + 1;
+                if (pr.frame % 3 === 0) paintFloor(pr.x, pr.y, pr.size, pr.color, false);
+                
+                let hitX = checkWallCollision(pr.x + pr.vx, pr.y, pr.size);
+                let hitY = checkWallCollision(pr.x, pr.y + pr.vy, pr.size);
+                
+                let bounced = false;
+                if (hitX) { pr.vx *= -1; bounced = true; }
+                if (hitY) { pr.vy *= -1; bounced = true; }
+                if (!hitX && !hitY && checkWallCollision(pr.x + pr.vx, pr.y + pr.vy, pr.size)) {
+                    pr.vx *= -1; pr.vy *= -1; bounced = true;
+                }
+                
+                if (bounced) {
+                    let oldSpd = Math.hypot(pr.vx, pr.vy) || 1;
+                    let rat = (oldSpd + 0.1) / oldSpd;
+                    pr.vx *= rat; pr.vy *= rat;
+                }
+                
+                pr.x += pr.vx; pr.y += pr.vy; pr.lifespan--;
+
+                for (let p of players) {
+                    if (p.isHidden) continue;
+                    if (p.team.id !== pr.teamId && Math.hypot(pr.x - p.x, pr.y - p.y) < pr.size * 0.6 + p.radius) {
+                        p.hp -= pr.damage; 
+                        if (p.hp <= 0) {
+                            let killer = players.find(x => x.name === pr.ownerName);
+                            if (killer && killer.name !== p.name) killer.kills++;
+                            if (pr.ownerName === players[0].name && p.name !== players[0].name) players[0].xpEarned += 50; 
+                            killPlayer(p);
+                            
+                            let oldSpd = Math.hypot(pr.vx, pr.vy) || 1;
+                            let rat = (oldSpd + 1.0) / oldSpd;
+                            pr.vx *= rat; pr.vy *= rat;
+                        }
+                    }
+                }
+
+                if (pr.lifespan <= 0) projectiles.splice(i, 1);
+                continue; 
+            }
+
+            if (pr.type === "homing") {
+                let target = players.find(p => p.name === pr.targetName && p.hp > 0);
+                if (target && !target.isHidden) {
+                    let angle = Math.atan2(target.y - pr.y, target.x - pr.x);
+                    pr.vx = Math.cos(angle) * pr.speed;
+                    pr.vy = Math.sin(angle) * pr.speed;
+                }
+            }
+
+            pr.x += pr.vx; pr.y += pr.vy; pr.lifespan--;
+
+            let hitWall = false;
+            if (pr.type !== 'homing') {
+                hitWall = checkWallCollision(pr.x, pr.y, 2);
+            }
+
+            let hitPlayer = null;
+            for (let p of players) {
+                if (p.isHidden) continue; 
+                if (pr.type === 'homing') {
+                    if (p.name === pr.targetName && Math.hypot(pr.x - p.x, pr.y - p.y) < pr.size * 0.6 + p.radius + pr.speed) {
+                        hitPlayer = p; break;
+                    }
+                } else {
+                    let isVendetta = (pr.ownerName === 'Blixer' && p.name === 'ImComingForYou_Blixer') || (pr.ownerName === 'ImComingForYou_Blixer' && p.name === 'Blixer');
+                    if ((p.team.id !== pr.teamId || isVendetta) && pr.ownerName !== p.name && Math.hypot(pr.x - p.x, pr.y - p.y) < pr.size * 0.6 + p.radius) { 
+                        hitPlayer = p; break; 
+                    }
+                }
+            }
+
+            if (pr.type === 'homing' && pr.lifespan <= 0 && !pr.returning && !hitPlayer) {
+                pr.returning = true;
+                pr.targetName = pr.ownerName; 
+                pr.speed = 35; 
+                pr.lifespan = 5000;
+                pr.color = '#ff0000'; 
+            } 
+            else if ((pr.type !== 'homing' && pr.lifespan <= 0) || hitWall || hitPlayer || (pr.type === 'homing' && pr.returning && pr.lifespan <= 0)) {
+                
+                if (pr.type === "explosive" || pr.type === "homing") {
+                    
+                    if (pr.type === "homing" && hitPlayer && hitPlayer.name === pr.targetName) {
+                        if (pr.returning) {
+                            eraseTurf(hitPlayer.team, 0.75); 
+                            hitPlayer.hp -= 9999; 
+                            killPlayer(hitPlayer);
+                            if(!hitPlayer.isAI) updateHUD();
+                        } else {
+                            eraseTurf(hitPlayer.team, 0.5); 
+                        }
+                    }
+
+                    paintFloor(pr.x, pr.y, pr.size, pr.color, true);
+                    for (let p of players) {
+                        if (p.isHidden) continue;
+                        let isVendettaAOE = (pr.ownerName === 'Blixer' && p.name === 'ImComingForYou_Blixer') || (pr.ownerName === 'ImComingForYou_Blixer' && p.name === 'Blixer');
+                        if ((p.team.id !== pr.teamId || isVendettaAOE || pr.type === 'homing') && Math.hypot(pr.x - p.x, pr.y - p.y) < pr.size * 3) {
+                            if (pr.type === 'homing' && !pr.returning && p.name === pr.ownerName) continue;
+
+                            p.hp -= pr.damage; 
+                            if (p.hp <= 0) {
+                                let killer = players.find(x => x.name === pr.ownerName);
+                                if (killer && killer.name !== p.name) killer.kills++;
+                                if (pr.ownerName === players[0].name && p.name !== players[0].name) players[0].xpEarned += 50; 
+                                killPlayer(p);
+                            }
+                            if(!p.isAI) updateHUD();
+                        }
+                    }
+                } else {
+                    paintFloor(pr.x, pr.y, pr.size, pr.color, false);
+                    if (hitPlayer) {
+                        hitPlayer.hp -= pr.damage; 
+                        if (hitPlayer.hp <= 0) {
+                            let killer = players.find(x => x.name === pr.ownerName);
+                            if (killer && killer.name !== hitPlayer.name) killer.kills++;
+                            if (pr.ownerName === players[0].name && hitPlayer.name !== players[0].name) players[0].xpEarned += 50;
+                            killPlayer(hitPlayer);
+                        }
+                        if(!hitPlayer.isAI) updateHUD();
+                    }
+                }
+                projectiles.splice(i, 1);
+            }
+        }
+    }
+
+    function fireWeapon(entity, weapon, angle, activeEvent) {
+        
+        if (weapon.type === 'mysterious_paper') {
+            entity.inventory[entity.currentSlot] = null;
+            entity.currentSlot = 0; 
+            if (!entity.isAI) updateHUD();
+            return;
+        }
+
+        if (weapon.type === 'crossover_box') {
+            let r = Math.random(), sum = 0, chosen = crossoverPool[0];
+            for (let w of crossoverPool) { sum += w.chance; if (r <= sum) { chosen = w; break; } }
+            let cW = {
+                name: `[?] ${chosen.name}`, color: "#ffff00",
+                range: chosen.range, speed: chosen.speed, spread: chosen.spread, fireRate: chosen.fireRate,
+                bulletSize: chosen.bulletSize, bulletCount: chosen.bulletCount, type: chosen.type, damage: chosen.damage, auto: chosen.auto, desc: chosen.desc
+            };
+            entity.inventory[entity.currentSlot] = cW;
+            if (!entity.isAI) updateHUD();
+            return;
+        }
+
+        if (weapon.type === 'blue_shell') {
+            if (liveRankings.length > 0) {
+                let targetName = liveRankings[0].name.replace(" Team", "");
+                let realTgt = players.find(p => p.hp > 0 && p.team.id !== entity.team.id && (p.name === targetName || p.team.id === targetName));
+                if (!realTgt) realTgt = players.find(p => p.hp > 0 && p.team.id !== entity.team.id);
+                
+                if (realTgt) {
+                    eraseTurf(realTgt.team, 0.5);
+                    realTgt.hp -= 9999;
+                    entity.kills++;
+                    if(entity.name === players[0].name) players[0].xpEarned += 50;
+                    killPlayer(realTgt);
+                    paintFloor(realTgt.x, realTgt.y, 200, entity.team.color, true);
+                }
+            }
+            entity.inventory[entity.currentSlot] = null;
+            entity.currentSlot = 0; 
+            if (!entity.isAI) updateHUD();
+            return;
+        }
+
+        if (weapon.type === 'chug_jug') {
+            entity.hp = 100;
+            if (!entity.isAI) {
+                entity.xpEarned += 100;
+                addXP(100);
+            }
+            entity.inventory[entity.currentSlot] = null;
+            entity.currentSlot = 0; 
+            if (!entity.isAI) updateHUD();
+            return;
+        }
+
+        if (weapon.type === 'octopus') {
+            entity.hasOctopus = true;
+            entity.inventory[entity.currentSlot] = null;
+            entity.currentSlot = 0; 
+            if (!entity.isAI) updateHUD();
+            return;
+        }
+
+        if (weapon.type === 'nuke') {
+            triggerNuke(entity);
+            entity.inventory[entity.currentSlot] = null;
+            entity.currentSlot = 0; 
+            if (!entity.isAI) updateHUD();
+            return;
+        }
+
+        if (weapon.type === 'boomerang') {
+            let finalDamage = weapon.damage * (activeEvent === 'Fallout' ? 2 : 1);
+            for (let i = 0; i < weapon.bulletCount; i++) {
+                const spreadAngle = angle + (Math.random() - 0.5) * weapon.spread;
+                projectiles.push({
+                    x: entity.x, y: entity.y, vx: Math.cos(spreadAngle) * weapon.speed, vy: Math.sin(spreadAngle) * weapon.speed,
+                    lifespan: weapon.range + (Math.random() * 2), size: weapon.bulletSize, color: entity.team.color,
+                    type: weapon.type, damage: finalDamage, teamId: entity.team.id, ownerName: entity.name, targetName: null, returning: false
+                });
+            }
+            entity.inventory[entity.currentSlot] = null;
+            entity.currentSlot = 0; 
+            if (!entity.isAI) updateHUD();
+            return;
+        }
+
+        let finalDamage = weapon.damage * (activeEvent === 'Fallout' ? 2 : 1);
+        let targetName = null;
+        
+        if (weapon.type === 'homing') {
+            if (liveRankings.length > 0) {
+                for (let r of liveRankings) {
+                    let rName = r.name.replace(" Team", "");
+                    let realTgt = players.find(p => p.hp > 0 && !p.isHidden && p.team.id !== entity.team.id && (p.name === rName || p.team.id === rName));
+                    if (realTgt) { targetName = realTgt.name; break; }
+                }
+                if (!targetName) {
+                    let closest = null, closestD = Infinity;
+                    players.forEach(p => {
+                        if (p.hp > 0 && !p.isHidden && p.team.id !== entity.team.id) {
+                            let d = Math.hypot(p.x - entity.x, p.y - entity.y);
+                            if (d < closestD) { closestD = d; closest = p; }
+                        }
+                    });
+                    if (closest) targetName = closest.name;
+                }
+            }
+        }
+
+        for (let i = 0; i < weapon.bulletCount; i++) {
+            const spreadAngle = angle + (Math.random() - 0.5) * weapon.spread;
+            projectiles.push({
+                x: entity.x, y: entity.y, vx: Math.cos(spreadAngle) * weapon.speed, vy: Math.sin(spreadAngle) * weapon.speed,
+                lifespan: weapon.range + (Math.random() * 2), size: weapon.bulletSize, color: entity.team.color,
+                type: weapon.type, damage: finalDamage, teamId: entity.team.id, ownerName: entity.name,
+                targetName: targetName, returning: false
+            });
+        }
+    }
+
+    function paintFloor(x, y, size, color, isExplosion) {
+        paintCtx.fillStyle = color; paintCtx.beginPath(); paintCtx.arc(x, y, size, 0, Math.PI * 2); paintCtx.fill();
+        let splatters = isExplosion ? 12 : 2, scatter = isExplosion ? size * 1.8 : size * 2;
+        for(let i = 0; i < splatters; i++){
+            paintCtx.beginPath(); paintCtx.arc(x + (Math.random()-0.5)*scatter, y + (Math.random()-0.5)*scatter, size * Math.random() * 0.6, 0, Math.PI * 2); paintCtx.fill();
+        }
+    }
+
+    function calculateScores() {
+        const endCtx = paintLayer.getContext('2d', { willReadFrequently: true });
+        const imgData = endCtx.getImageData(0, 0, mapWidth, mapHeight).data;
+        let scores = Array(teams.length).fill(0), totalPainted = 0;
+        
+        for (let i = 0; i < imgData.length; i += 16) {
+            let r = imgData[i], g = imgData[i+1], b = imgData[i+2], a = imgData[i+3];
+            if (a > 50) {
+                for(let t=0; t<teams.length; t++) {
+                    if (Math.abs(r - teams[t].hex[0]) < 10 && Math.abs(g - teams[t].hex[1]) < 10 && Math.abs(b - teams[t].hex[2]) < 10) {
+                        scores[t]++; totalPainted++; break;
+                    }
+                }
+            }
+        }
+
+        let playerPaintedPixels = scores[0]; 
+        let mapXP = Math.floor(playerPaintedPixels / 150);
+        let totalXPGained = players[0].xpEarned + mapXP;
+        let didLevelUp = addXP(totalXPGained);
+
+        document.getElementById('match-xp-gains').innerHTML = `+${players[0].xpEarned} Combat XP <br>+${mapXP} Turf XP<br><span style="color:#fff; font-size: 0.9rem;">Total: +${totalXPGained} XP ${didLevelUp ? '(LEVEL UP!)' : ''}</span>`;
+        updateMenuLevel();
+
+        const board = document.getElementById('scoreboard'); 
+        
+        Array.from(board.children).forEach(c => { if(c.id !== 'score-header-bar') board.removeChild(c) });
+        
+        let results;
+        if (gameMode === 'ffa') {
+            document.getElementById('score-header-bar').innerHTML = '<span class="score-col">Player</span><span class="score-col">Turf %</span><span class="score-col">Kills</span><span class="score-col">Deaths</span><span class="score-col">K/D Ratio</span>';
+            results = players.map((p, idx) => ({ 
+                name: p.name, color: p.team.color, percent: totalPainted === 0 ? 0 : ((scores[idx] / totalPainted) * 100).toFixed(1),
+                kills: p.kills, deaths: p.deaths, kdr: (p.kills / Math.max(1, p.deaths)).toFixed(2)
+            })).sort((a, b) => b.percent - a.percent); 
+        } else if (ctfActive) {
+            document.getElementById('score-header-bar').innerHTML = '<span class="score-col">Team</span><span class="score-col">Captures</span><span class="score-col">Turf %</span><span class="score-col">Kills</span><span class="score-col">Deaths</span>';
+            let teamKills = [0,0]; let teamDeaths = [0,0];
+            players.forEach(p => { if(p.team.id==='Red'){teamKills[0]+=p.kills; teamDeaths[0]+=p.deaths;} else{teamKills[1]+=p.kills; teamDeaths[1]+=p.deaths;} });
+            results = [
+                { name: 'Red Team', color: TEAM_RED.color, caps: ctfScores.Red, percent: ((scores[0] / totalPainted)*100||0).toFixed(1), kills: teamKills[0], deaths: teamDeaths[0] },
+                { name: 'Blue Team', color: TEAM_BLUE.color, caps: ctfScores.Blue, percent: ((scores[1] / totalPainted)*100||0).toFixed(1), kills: teamKills[1], deaths: teamDeaths[1] }
+            ].sort((a,b) => b.caps - a.caps);
+        } else {
+            document.getElementById('score-header-bar').innerHTML = '<span class="score-col">Team</span><span class="score-col">Turf %</span><span class="score-col">Kills</span><span class="score-col">Deaths</span><span class="score-col">K/D Ratio</span>';
+            let teamKills = [0,0]; let teamDeaths = [0,0];
+            players.forEach(p => { if(p.team.id==='Red'){teamKills[0]+=p.kills; teamDeaths[0]+=p.deaths;} else{teamKills[1]+=p.kills; teamDeaths[1]+=p.deaths;} });
+            results = [
+                { name: 'Red Team', color: TEAM_RED.color, percent: ((scores[0] / totalPainted)*100||0).toFixed(1), kills: teamKills[0], deaths: teamDeaths[0], kdr: (teamKills[0]/Math.max(1,teamDeaths[0])).toFixed(2) },
+                { name: 'Blue Team', color: TEAM_BLUE.color, percent: ((scores[1] / totalPainted)*100||0).toFixed(1), kills: teamKills[1], deaths: teamDeaths[1], kdr: (teamKills[1]/Math.max(1,teamDeaths[1])).toFixed(2) }
+            ].sort((a,b) => b.percent - a.percent);
+        }
+        
+        results.forEach(res => {
+            const row = document.createElement('div'); row.className = 'score-row'; row.style.backgroundColor = res.color;
+            if (ctfActive) {
+                row.innerHTML = `<span class="score-col">${res.name}</span><span class="score-col">${res.caps}</span><span class="score-col">${res.percent}%</span><span class="score-col">${res.kills}</span><span class="score-col">${res.deaths}</span>`;
+            } else {
+                row.innerHTML = `<span class="score-col">${res.name}</span><span class="score-col">${res.percent}%</span><span class="score-col">${res.kills}</span><span class="score-col">${res.deaths}</span><span class="score-col">${res.kdr}</span>`;
+            }
+            board.appendChild(row);
+        });
+    }
+
+    function draw() {
+        let activeEvent = getActiveEvent();
+        if (activeEvent === 'Glitched') ctx.fillStyle = '#1c0a1f';
+        else if (activeEvent === 'Space') ctx.fillStyle = '#060614';
+        else if (activeEvent === 'Fallout') ctx.fillStyle = '#101a10';
+        else ctx.fillStyle = '#e0e0e0';
+
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (!isPlaying && document.getElementById('game-over').classList.contains('hidden')) return;
+
+        ctx.save(); ctx.translate(-camera.x, -camera.y);
+        ctx.fillRect(0, 0, mapWidth, mapHeight); 
+        ctx.drawImage(paintLayer, 0, 0);
+
+        ctx.strokeStyle = '#444'; ctx.lineWidth = 10; ctx.strokeRect(0, 0, mapWidth, mapHeight);
+
+        if (ctfActive) {
+            ctx.fillStyle = 'rgba(255, 0, 85, 0.3)'; ctx.beginPath(); ctx.arc(200, mapHeight/2, 60, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = 'rgba(0, 136, 255, 0.3)'; ctx.beginPath(); ctx.arc(mapWidth-200, mapHeight/2, 60, 0, Math.PI*2); ctx.fill();
+            
+            ctfFlags.forEach(f => {
+                ctx.fillStyle = f.color; ctx.fillRect(f.x - 10, f.y - 30, 20, 20); 
+                ctx.fillStyle = '#fff'; ctx.fillRect(f.x - 2, f.y - 30, 4, 30);    
+            });
+        }
+
+        droppedItems.forEach(item => {
+            ctx.fillStyle = item.weapon.color; ctx.beginPath(); ctx.arc(item.x, item.y, item.radius, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+            ctx.fillStyle = '#000'; ctx.font = 'bold 12px "Lexend", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            
+            let charLabel = item.weapon.name.includes('[?]') ? '?' : item.weapon.name.charAt(0);
+            ctx.fillText(charLabel, item.x, item.y + 1);
+        });
+
+        chests.forEach(c => {
+            ctx.fillStyle = '#8B4513'; ctx.fillRect(c.x - 12, c.y - 10, 24, 20);
+            ctx.fillStyle = '#FFD700'; ctx.fillRect(c.x - 4, c.y - 2, 8, 6);
+        });
+
+        ctx.fillStyle = '#333';
+        walls.forEach(w => { ctx.fillRect(w.x, w.y, w.w, w.h); ctx.fillStyle = '#555'; ctx.fillRect(w.x, w.y, w.w, 5); ctx.fillStyle = '#333'; });
+
+        projectiles.forEach(p => {
+            ctx.fillStyle = p.type === 'explosive' || p.type === 'homing' || p.type === 'boomerang' ? '#222' : p.color; 
+            
+            if (p.type === 'homing' && p.returning) {
+                ctx.fillStyle = '#ff0000'; 
+            }
+
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.type === 'explosive' || p.type === 'homing' ? p.size * 0.3 : p.size * 0.6, 0, Math.PI * 2); ctx.fill();
+            
+            if (p.type === 'homing') {
+                ctx.strokeStyle = p.returning ? '#fff' : '#f00'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.stroke();
+            } else if (p.type === 'boomerang') {
+                ctx.strokeStyle = '#00ffcc'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.stroke();
+            }
+        });
+
+        players.forEach(p => {
+            if (p.isHidden) {
+                ctx.strokeStyle = p.team.color; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.radius * 0.8, 0, Math.PI * 2); ctx.stroke();
+                return; 
+            }
+
+            ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = p.team.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius * 0.5, 0, Math.PI * 2); ctx.fill();
+            
+            let angle = p.isAI ? Math.atan2(p.targetY - p.y, p.targetX - p.x) : Math.atan2(mouse.worldY - p.y, mouse.worldX - p.x);
+            ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(angle);
+            ctx.fillStyle = p.inventory[p.currentSlot] ? (p.inventory[p.currentSlot].color || '#333') : '#333'; 
+            ctx.fillRect(p.radius - 2, -3, 16, 6); ctx.restore();
+
+            if (p.isAI) {
+                if(p.skill === 'pro') ctx.fillStyle = '#ffcc00'; else if (p.skill === 'average') ctx.fillStyle = '#fff'; else ctx.fillStyle = '#aaa';
+                ctx.font = 'bold 12px "Lexend", sans-serif'; ctx.textAlign = 'center'; ctx.fillText(p.name, p.x, p.y - p.radius - 12);
+                if (p.hp < 100) {
+                    ctx.fillStyle = '#f00'; ctx.fillRect(p.x - p.radius, p.y - p.radius - 8, p.radius * 2, 4);
+                    ctx.fillStyle = '#0f0'; ctx.fillRect(p.x - p.radius, p.y - p.radius - 8, (p.radius * 2) * (p.hp / 100), 4);
+                }
+            }
+        });
+        ctx.restore();
+    }
+
+    function loop() { update(); draw(); requestAnimationFrame(loop); }
+    loop();
+</script>
+</body>
+</html>
