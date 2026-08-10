@@ -1,8 +1,46 @@
-<iframe 
-    src="https://drunken-tug-war.netlify.app/" 
-    width="800" 
-    height="600" 
-    title="Dig Site"
-    style="border: none;"
-    allowfullscreen>
-</iframe>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DTW</title>
+  <style>
+    /* Remove default browser margins and scrollbars */
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #000;
+    }
+
+    /* Make the container stretch to the full viewport size */
+    .game-container {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* Force the iframe to fill 100% of the container */
+    .game-container iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="game-container">
+    <iframe 
+      src="https://drunken-tug-war.netlify.app/" 
+      title="Mine Digger Game"
+      allowfullscreen>
+    </iframe>
+  </div>
+
+</body>
+</html>
